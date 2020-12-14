@@ -1,4 +1,5 @@
 const express = require("express");
+const multer = require("multer");
 const User = require("../models/user");
 const auth = require("../middleware/auth");
 const router = new express.Router();
@@ -55,9 +56,7 @@ router.get("/users/me", auth, async (req, res) => {
   res.send(req.user);
 });
 
-
-
-router.patch("/users/me",auth, async (req, res) => {
+router.patch("/users/me", auth, async (req, res) => {
   const updates = Object.keys(req.body);
   const allowedUpdates = ["name", "email", "password", "age"];
   const isValidOperation = updates.every((update) =>
@@ -68,7 +67,6 @@ router.patch("/users/me",auth, async (req, res) => {
   }
 
   try {
-
     updates.forEach((update) => (req.user[update] = req.body[update]));
     await req.user.save();
     res.send(req.user);
@@ -77,13 +75,45 @@ router.patch("/users/me",auth, async (req, res) => {
   }
 });
 
-router.delete("/users/me",auth,  async (req, res) => {
+router.delete("/users/me", auth, async (req, res) => {
   try {
-    await req.user.remove()
+    await req.user.remove();
     res.send(req.user);
   } catch (e) {
     res.status(500).send();
   }
+});
+
+const upload = multer({
+  limits: {
+    fileSize: 10000000,
+  },
+  fileFilter(req, file, cb) {
+    if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
+      return cb(new Error("Please upload an image"));
+    }
+    cb(undefined, true);
+  },
+});
+
+router.post(
+  "/users/me/avatar",
+  auth,
+  upload.single("avatar"),
+  async (req, res) => {
+    req.user.avatar = req.file.buffer;
+    await req.user.save();
+    res.send();
+  },
+  (error, req, res, newt) => {
+    res.status(400).send({ error: error.message });
+  }
+);
+
+router.delete("/users/me/avatar", auth, async (req, res) => {
+  req.user.avatar = undefined;
+  await req.user.save();
+  res.send();
 });
 
 module.exports = router;
